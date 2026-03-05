@@ -137,6 +137,16 @@ export const pumblePlugin: ChannelPlugin<ResolvedPumbleAccount> = {
   groups: {
     resolveRequireMention: resolvePumbleGroupRequireMention,
   },
+  threading: {
+    buildToolContext: ({ context, hasRepliedRef }) => ({
+      currentChannelId: context.To?.trim() || undefined,
+      currentChannelProvider: "pumble",
+      currentThreadTs:
+        (context.MessageThreadId != null ? String(context.MessageThreadId) : undefined) ??
+        (context.ReplyToId != null ? String(context.ReplyToId) : undefined),
+      hasRepliedRef,
+    }),
+  },
   messaging: {
     normalizeTarget: normalizePumbleMessagingTarget,
     targetResolver: {
@@ -160,10 +170,6 @@ export const pumblePlugin: ChannelPlugin<ResolvedPumbleAccount> = {
       return { ok: true, to: trimmed };
     },
     sendText: async ({ to, text, accountId, replyToId }) => {
-      const rt = getPumbleRuntime();
-      console.error(
-        `pumble DEBUG outbound.sendText: to=${to} replyToId=${replyToId ?? "none"} accountId=${accountId ?? "default"} textLen=${text.length}`,
-      );
       const suffix = resolveSubagentLabelSuffix({
         threadRootId: replyToId ?? undefined,
         accountId: accountId ?? undefined,
@@ -175,10 +181,6 @@ export const pumblePlugin: ChannelPlugin<ResolvedPumbleAccount> = {
       return { channel: "pumble", ...result };
     },
     sendMedia: async ({ to, text, mediaUrl, accountId, replyToId }) => {
-      const rt = getPumbleRuntime();
-      console.error(
-        `pumble DEBUG outbound.sendMedia: to=${to} replyToId=${replyToId ?? "none"} accountId=${accountId ?? "default"} mediaUrl=${mediaUrl ?? "none"} textLen=${text.length}`,
-      );
       const suffix = resolveSubagentLabelSuffix({
         threadRootId: replyToId ?? undefined,
         accountId: accountId ?? undefined,

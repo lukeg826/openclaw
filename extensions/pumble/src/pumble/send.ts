@@ -130,10 +130,6 @@ export async function sendMessagePumble(
     throw new Error("Pumble message is empty");
   }
 
-  console.error(
-    `pumble DEBUG send: to=${to} target=${JSON.stringify(target)} replyToId=${opts.replyToId ?? "none"} hasMedia=${!!sdkFiles?.length} messageLen=${message.length}`,
-  );
-
   let result: PumbleSendResult;
   if (sdkFiles?.length) {
     // Use the SDK bot client for file uploads — handles the 3-step upload internally.
@@ -161,20 +157,10 @@ export async function sendMessagePumble(
       await botClient.v1.messages.dmUser(userId, payload);
       result = { messageId: "unknown", channelId: userId };
     } else if (opts.replyToId) {
-      console.error(
-        `pumble DEBUG sdk.reply: replyToId=${opts.replyToId} channelId=${target.id} filesCount=${sdkFiles.length}`,
-      );
       const msg = await botClient.v1.messages.reply(opts.replyToId, target.id, payload);
-      console.error(`pumble DEBUG sdk.reply result: messageId=${msg.id} channelId=${target.id}`);
       result = { messageId: msg.id ?? "unknown", channelId: target.id };
     } else {
-      console.error(
-        `pumble DEBUG sdk.postMessageToChannel: channelId=${target.id} filesCount=${sdkFiles.length}`,
-      );
       const msg = await botClient.v1.messages.postMessageToChannel(target.id, payload);
-      console.error(
-        `pumble DEBUG sdk.postMessageToChannel result: messageId=${msg.id} channelId=${target.id}`,
-      );
       result = { messageId: msg.id ?? "unknown", channelId: target.id };
     }
   } else if (target.kind === "user") {
@@ -182,24 +168,17 @@ export async function sendMessagePumble(
     if (!userId) {
       throw new Error("Pumble DM requires a user ID or email");
     }
-    console.error(`pumble DEBUG rest.postPumbleDm: userId=${userId} textLen=${message.length}`);
     const msg = await postPumbleDm(client, { userId, text: message });
     result = {
       messageId: msg.id ?? "unknown",
       channelId: msg.channelId ?? userId,
     };
   } else {
-    console.error(
-      `pumble DEBUG rest.postPumbleMessage: channelId=${target.id} threadRootId=${opts.replyToId ?? "none"} textLen=${message.length}`,
-    );
     const msg = await postPumbleMessage(client, {
       channelId: target.id,
       text: message,
       threadRootId: opts.replyToId,
     });
-    console.error(
-      `pumble DEBUG rest.postPumbleMessage result: messageId=${msg.id} channelId=${target.id}`,
-    );
     result = {
       messageId: msg.id ?? "unknown",
       channelId: target.id,

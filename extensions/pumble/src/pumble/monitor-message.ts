@@ -19,6 +19,7 @@ import {
   resolveControlCommandGate,
   resolveAckReaction,
 } from "openclaw/plugin-sdk";
+import { clearPumbleThreadContext, setPumbleThreadContext } from "../runtime.js";
 import type { PumbleAccountConfig } from "../types.js";
 import type { ResolvedPumbleAccount } from "./accounts.js";
 import { toPumbleShortcode } from "./emoji.js";
@@ -469,9 +470,14 @@ export function createHandlePumbleMessage(deps: HandlePumbleMessageDeps) {
     }
 
     const to = kind === "direct" ? `user:${senderId}` : `channel:${channelId}`;
-    runtime.log?.(
-      `pumble DEBUG inbound context: channelId=${channelId} threadRootId=${threadRootId ?? "none"} evt.messageId=${evt.messageId} to=${to} ReplyToId=${threadRootId ?? evt.messageId}`,
-    );
+    // Store thread context so the before_tool_call hook can auto-inject
+    // replyTo for agent message tool sends targeting this thread.
+    // Clear when not in a thread so stale context doesn't leak.
+    if (threadRootId) {
+      setPumbleThreadContext(sessionKey, { to: to.toLowerCase(), threadRootId });
+    } else {
+      clearPumbleThreadContext(sessionKey);
+    }
     const ctxPayload = core.channel.reply.finalizeInboundContext({
       Body: combinedBody,
       BodyForAgent: bodyText,
@@ -567,10 +573,6 @@ export function createHandlePumbleMessage(deps: HandlePumbleMessageDeps) {
           const replyToId = threadRootId ?? evt.messageId;
           const labelSuffix =
             isBoundThreadSession && boundThreadLabel ? ` [${boundThreadLabel}]` : "";
-
-          runtime.log?.(
-            `pumble DEBUG deliver callback: to=${to} replyToId=${replyToId} threadRootId=${threadRootId ?? "none"} evt.messageId=${evt.messageId} payload.mediaUrl=${payload.mediaUrl ?? "none"} payload.mediaUrls=${JSON.stringify(payload.mediaUrls ?? [])} payload.text=${(payload.text ?? "").slice(0, 80)}`,
-          );
 
           // Handle media (images, files) from agent tool results
           const mediaList = payload.mediaUrls ?? (payload.mediaUrl ? [payload.mediaUrl] : []);
