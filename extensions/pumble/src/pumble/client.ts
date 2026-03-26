@@ -193,7 +193,7 @@ export async function addPumbleReactionRest(
 ): Promise<void> {
   await client.request(`/v1/messages/${params.messageId}/reactions`, {
     method: "POST",
-    body: JSON.stringify({ code: params.emojiCode }),
+    body: JSON.stringify({ code: params.emojiCode, skinTone: 1 }),
   });
 }
 
@@ -203,6 +203,6 @@ export async function removePumbleReactionRest(
 ): Promise<void> {
   await client.request(`/v1/messages/${params.messageId}/reactions`, {
     method: "DELETE",
-    body: JSON.stringify({ code: params.emojiCode }),
+    body: JSON.stringify({ code: params.emojiCode, skinTone: 1 }),
   });
 }

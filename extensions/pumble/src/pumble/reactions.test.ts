@@ -41,7 +41,10 @@ describe("addPumbleReaction", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const reactionCall = mockFetch.mock.calls[0]!;
     expect(reactionCall[0]).toContain("/v1/messages/msg-123/reactions");
-    expect(JSON.parse(reactionCall[1]?.body as string)).toEqual({ code: ":thumbsup:" });
+    expect(JSON.parse(reactionCall[1]?.body as string)).toEqual({
+      code: ":thumbsup:",
+      skinTone: 1,
+    });
   });
 
   it("strips colons from emoji name", async () => {
@@ -55,7 +58,7 @@ describe("addPumbleReaction", () => {
     });
 
     const reactionCall = mockFetch.mock.calls[0]!;
-    expect(JSON.parse(reactionCall[1]?.body as string)).toEqual({ code: ":wave:" });
+    expect(JSON.parse(reactionCall[1]?.body as string)).toEqual({ code: ":wave:", skinTone: 1 });
   });
 
   it("returns error when bot token is missing", async () => {
