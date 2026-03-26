@@ -421,8 +421,14 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
       });
     };
 
-    // Each reconnect iteration creates a WebSocket connection via the SDK.
-    // The SDK handles ping/pong keepalive internally (25s interval).
+    const useWebhookMode = typeof account.config.webhookPort === "number";
+    const modeLabel = useWebhookMode
+      ? `HTTP webhook on port ${account.config.webhookPort}`
+      : "WebSocket";
+
+    // Each reconnect iteration starts either a WebSocket connection or an
+    // HTTP webhook listener (behind a WebSocket broadcaster), depending on
+    // whether webhookPort is configured.
     const connectOnce = async (): Promise<void> => {
       const store = new OcCredentialsStore(account.accountId, account);
       const addon = createPumbleAddon(account, store);
@@ -430,17 +436,16 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
       registerHandlers(addon);
 
       opts.statusSink?.({ connected: true, lastConnectedAt: Date.now() });
-      runtime.log?.(`pumble: WebSocket connecting for account "${account.accountId}"`);
+      runtime.log?.(`pumble: ${modeLabel} connecting for account "${account.accountId}"`);
 
       try {
-        // Start the WebSocket connection (SDK handles transport internally).
         await addon.start();
 
         // Register active addon so send.ts can use the SDK bot client for media uploads.
         const addonWorkspaceId = account.workspaceId || account.accountId;
         setActivePumbleAddon(addon, addonWorkspaceId, account.accountId);
 
-        runtime.log?.(`pumble: WebSocket connected — listening for events`);
+        runtime.log?.(`pumble: ${modeLabel} connected — listening for events`);
 
         // Hold until abort fires.
         await new Promise<void>((resolve) => {

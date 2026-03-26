@@ -36,6 +36,7 @@ const PumbleAccountSchemaBase = z
         ttlHours: z.number().optional(),
       })
       .optional(),
+    webhookPort: z.number().int().positive().optional(),
   })
   .strict();
 

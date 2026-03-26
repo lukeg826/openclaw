@@ -51,6 +51,8 @@ export type PumbleAccountConfig = {
     spawnSubagentSessions?: boolean;
     ttlHours?: number;
   };
+  /** Local HTTP port for webhook mode (behind a WebSocket broadcaster). When set, disables direct WebSocket mode. */
+  webhookPort?: number;
 };
 
 export type PumbleConfig = {

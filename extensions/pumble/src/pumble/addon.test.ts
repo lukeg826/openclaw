@@ -37,6 +37,12 @@ describe("buildPumbleManifest", () => {
     expect(manifest.eventSubscriptions.events).toContain("NEW_MESSAGE");
   });
 
+  it("uses HTTP webhook mode when webhookPort is set", () => {
+    const manifest = buildPumbleManifest(makeAccount({ config: { webhookPort: 5113 } }));
+    expect(manifest.socketMode).toBe(false);
+    expect(manifest.eventSubscriptions.url).toBe("/hook");
+  });
+
   it("trims whitespace from credential fields", () => {
     const manifest = buildPumbleManifest(
       makeAccount({

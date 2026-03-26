@@ -6,8 +6,10 @@ import type { ResolvedPumbleAccount } from "./accounts.js";
  * Build a pumble-sdk AddonManifest from an OpenClaw Pumble account config.
  *
  * Requires appId, appKey, clientSecret, and signingSecret to be present.
- * Sets `socketMode: true` so the SDK connects via WebSocket for real-time
- * events — no public URL, tunnel, or HTTP webhook server required.
+ *
+ * When `webhookPort` is set in the account config, the addon runs in HTTP
+ * webhook mode (socketMode: false) — used behind a WebSocket broadcaster
+ * that forwards events to localhost. Otherwise, uses direct WebSocket mode.
  */
 export function buildPumbleManifest(account: ResolvedPumbleAccount): AddonManifest {
   if (!account.appId?.trim()) {
@@ -23,9 +25,11 @@ export function buildPumbleManifest(account: ResolvedPumbleAccount): AddonManife
     throw new Error("Pumble signingSecret is required for SDK mode");
   }
 
+  const useWebhookMode = typeof account.config.webhookPort === "number";
+
   return {
     id: account.appId.trim(),
-    socketMode: true,
+    socketMode: !useWebhookMode,
     appKey: account.appKey.trim(),
     clientSecret: account.clientSecret.trim(),
     signingSecret: account.signingSecret.trim(),
@@ -34,7 +38,7 @@ export function buildPumbleManifest(account: ResolvedPumbleAccount): AddonManife
     dynamicMenus: [] as const,
     redirectUrls: [],
     eventSubscriptions: {
-      url: "",
+      url: useWebhookMode ? "/hook" : "",
       events: ["NEW_MESSAGE" as const, "REACTION_ADDED" as const, "UPDATED_MESSAGE" as const],
     },
     scopes: {
@@ -56,17 +60,18 @@ export function buildPumbleManifest(account: ResolvedPumbleAccount): AddonManife
 /**
  * Create a pumble-sdk Addon instance wired with an OcCredentialsStore.
  *
- * Uses `socketMode: true` — calling `addon.start()` establishes a WebSocket
- * connection to Pumble for real-time event delivery.
+ * When `webhookPort` is configured, runs in HTTP webhook mode on that port
+ * (for use behind a WebSocket broadcaster). Otherwise, connects directly
+ * to Pumble via WebSocket.
  */
 export function createPumbleAddon(
   account: ResolvedPumbleAccount,
   credentialsStore: CredentialsStore,
 ): Addon {
   const manifest = buildPumbleManifest(account);
-  // serverPort is required by the SDK type signature but unused in socket mode.
+  const port = account.config.webhookPort ?? 0;
   return setup(manifest, {
-    serverPort: 0,
+    serverPort: port,
     oauth2Config: {
       tokenStore: credentialsStore,
     },
