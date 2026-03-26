@@ -576,8 +576,10 @@ export function createHandlePumbleMessage(deps: HandlePumbleMessageDeps) {
         });
       },
     });
-    const { dispatcher, replyOptions, markDispatchIdle } =
-      core.channel.reply.createReplyDispatcherWithTyping({
+    await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+      ctx: ctxPayload,
+      cfg,
+      dispatcherOptions: {
         ...prefixOptions,
         humanDelay: core.channel.reply.resolveHumanDelayConfig(cfg, route.agentId),
         typingCallbacks,
@@ -628,52 +630,35 @@ export function createHandlePumbleMessage(deps: HandlePumbleMessageDeps) {
         onError: (err, info) => {
           runtime.error?.(`pumble ${info.kind} reply failed: ${String(err)}`);
         },
-      });
-
-    await core.channel.reply.withReplyDispatcher({
-      dispatcher,
-      onSettled: () => {
-        markDispatchIdle();
-        // Remove ack reaction after reply is delivered
-        runtime.log?.(
-          `pumble: onSettled — removeAckAfterReply=${removeAckAfterReply} ackEmojiName=${ackEmojiName} hasPromise=${!!ackReactionPromise}`,
-        );
-        if (removeAckAfterReply && ackEmojiName) {
-          core.channel.reactions.removeAckReactionAfterReply({
-            removeAfterReply: removeAckAfterReply,
-            ackReactionPromise,
-            ackReactionValue: ackEmojiName,
-            remove: async () => {
-              runtime.log?.(`pumble: removing ack reaction ${ackEmojiName} from ${evt.messageId}`);
-              const result = await removePumbleReaction({
-                cfg,
-                messageId: evt.messageId,
-                emojiName: ackEmojiName,
-                accountId: account.accountId,
-              });
-              runtime.log?.(`pumble: remove ack reaction result: ${JSON.stringify(result)}`);
-            },
-            onError: (err) => {
-              runtime.log?.(
-                `pumble: remove ack reaction failed for ${evt.messageId}: ${String(err)}`,
-              );
-            },
-          });
-        }
       },
-      run: () =>
-        core.channel.reply.dispatchReplyFromConfig({
-          ctx: ctxPayload,
-          cfg,
-          dispatcher,
-          replyOptions: {
-            ...replyOptions,
-            disableBlockStreaming:
-              typeof account.blockStreaming === "boolean" ? !account.blockStreaming : undefined,
-            onModelSelected,
-          },
-        }),
+      replyOptions: {
+        disableBlockStreaming:
+          typeof account.blockStreaming === "boolean" ? !account.blockStreaming : undefined,
+        onModelSelected,
+      },
     });
+
+    // Remove ack reaction after reply is fully delivered
+    if (removeAckAfterReply && ackEmojiName) {
+      core.channel.reactions.removeAckReactionAfterReply({
+        removeAfterReply: removeAckAfterReply,
+        ackReactionPromise,
+        ackReactionValue: ackEmojiName,
+        remove: async () => {
+          runtime.log?.(`pumble: removing ack reaction ${ackEmojiName} from ${evt.messageId}`);
+          const result = await removePumbleReaction({
+            cfg,
+            messageId: evt.messageId,
+            emojiName: ackEmojiName,
+            accountId: account.accountId,
+          });
+          runtime.log?.(`pumble: remove ack reaction result: ${JSON.stringify(result)}`);
+        },
+        onError: (err) => {
+          runtime.log?.(`pumble: remove ack reaction failed for ${evt.messageId}: ${String(err)}`);
+        },
+      });
+    }
     if (historyKey) {
       clearHistoryEntriesIfEnabled({
         historyMap: channelHistories,
