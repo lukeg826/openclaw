@@ -448,12 +448,9 @@ importers:
 
   extensions/pumble:
     dependencies:
-      localtunnel:
-        specifier: ^2.0.0
-        version: 2.0.2
       pumble-sdk:
-        specifier: ^1.0.2
-        version: 1.0.2(socks@2.8.7)
+        specifier: ^1.1.0
+        version: 1.1.0(socks@2.8.7)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -3782,9 +3779,6 @@ packages:
   aws4@1.13.2:
     resolution: {integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==}
 
-  axios@0.21.4:
-    resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
-
   axios@1.13.5:
     resolution: {integrity: sha512-cz4ur7Vb0xS4/KUN0tPWe44eqxrIu31me+fbang3ijiNscE129POzipJJA6zniq2C/Z6sJCjMimjS8Lc/GAs8Q==}
 
@@ -4095,15 +4089,6 @@ packages:
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
-    peerDependencies:
-      supports-color: '*'
-    peerDependenciesMeta:
-      supports-color:
-        optional: true
-
-  debug@4.3.2:
-    resolution: {integrity: sha512-mOp8wKcvj7XxC78zLgw/ZA+6TSgkoE2C/ienthhRD298T7UNwAg9diBpLRxC0mOezLl4B0xV7M0cCO6P/O0Xhw==}
-    engines: {node: '>=6.0'}
     peerDependencies:
       supports-color: '*'
     peerDependenciesMeta:
@@ -4944,11 +4929,6 @@ packages:
   lit@3.3.2:
     resolution: {integrity: sha512-NF9zbsP79l4ao2SNrH3NkfmFgN/hBYSQo90saIVI1o5GpjAdCPVstVzO1MrLOakHoEhYkrtRjPK6Ob521aoYWQ==}
 
-  localtunnel@2.0.2:
-    resolution: {integrity: sha512-n418Cn5ynvJd7m/N1d9WVJISLJF/ellZnfsLnx8WBWGzxv/ntNcFkJ1o6se5quUhCplfLGBNL5tYHiq5WF3Nug==}
-    engines: {node: '>=8.3.0'}
-    hasBin: true
-
   lodash.camelcase@4.3.0:
     resolution: {integrity: sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==}
 
@@ -5200,9 +5180,6 @@ packages:
   ms@2.0.0:
     resolution: {integrity: sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==}
 
-  ms@2.1.2:
-    resolution: {integrity: sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==}
-
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -5386,9 +5363,6 @@ packages:
     peerDependencies:
       '@napi-rs/canvas': ^0.1.89
       node-llama-cpp: 3.16.2
-
-  openurl@1.1.1:
-    resolution: {integrity: sha512-d/gTkTb1i1GKz5k3XE3XFV/PxQ1k45zDqGP2OA7YhgsaLoqm6qRvARAZOFer1fcXritWlGBRCu/UgeS4HAnXAA==}
 
   opus-decoder@0.7.11:
     resolution: {integrity: sha512-+e+Jz3vGQLxRTBHs8YJQPRPc1Tr+/aC6coV/DlZylriA29BdHQAYXhvNRKtjftof17OFng0+P4wsFIqQu3a48A==}
@@ -5646,8 +5620,8 @@ packages:
   psl@1.15.0:
     resolution: {integrity: sha512-JZd3gMVBAVQkSs6HdNZo9Sdo0LNcQeMNP3CozBJb3JYC/QUYZTnKxP+f8oWRX4rHP5EurWxqAHTSwUCjlNKa1w==}
 
-  pumble-sdk@1.0.2:
-    resolution: {integrity: sha512-q4GdR1fzdEgVV9/iPtSgEoTaZ/q23H0aZefpxknis3Hn6hj44Hh0TJjt0MALb1SDPYpOnX+iol0+dquXL02e4A==}
+  pumble-sdk@1.1.0:
+    resolution: {integrity: sha512-i5zKIvjp6LrpXQlACO0aQ7qTRdE7zRSxwJ2lkGtopUCLbnYxb4pqbfikGbodnutPAw3CiUlrJcOTyaQEw7lfjQ==}
 
   pump@3.0.3:
     resolution: {integrity: sha512-todwxLMY7/heScKmntwQG8CXVkWUOdYxIvY2s0VWAAMh/nd8SoYiRaKjlr7+iCs984f2P8zvrfWcDDYVb73NfA==}
@@ -6535,10 +6509,6 @@ packages:
   yargs@16.2.0:
     resolution: {integrity: sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw==}
     engines: {node: '>=10'}
-
-  yargs@17.1.1:
-    resolution: {integrity: sha512-c2k48R0PwKIqKhPMWjeiF6y2xY/gPMUlro0sgxqXpbOIohWiLNXWslsootttv7E1e73QPAMQSg5FeySbVcpsPQ==}
-    engines: {node: '>=12'}
 
   yargs@17.7.2:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
@@ -10498,15 +10468,9 @@ snapshots:
 
   aws4@1.13.2: {}
 
-  axios@0.21.4(debug@4.3.2):
-    dependencies:
-      follow-redirects: 1.15.11(debug@4.3.2)
-    transitivePeerDependencies:
-      - debug
-
   axios@1.13.5:
     dependencies:
-      follow-redirects: 1.15.11(debug@4.3.2)
+      follow-redirects: 1.15.11
       form-data: 2.5.4
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -10799,10 +10763,6 @@ snapshots:
   debug@2.6.9:
     dependencies:
       ms: 2.0.0
-
-  debug@4.3.2:
-    dependencies:
-      ms: 2.1.2
 
   debug@4.4.3:
     dependencies:
@@ -11148,9 +11108,7 @@ snapshots:
 
   flatbuffers@24.12.23: {}
 
-  follow-redirects@1.15.11(debug@4.3.2):
-    optionalDependencies:
-      debug: 4.3.2
+  follow-redirects@1.15.11: {}
 
   foreground-child@3.3.1:
     dependencies:
@@ -11754,15 +11712,6 @@ snapshots:
       lit-element: 4.2.2
       lit-html: 3.3.2
 
-  localtunnel@2.0.2:
-    dependencies:
-      axios: 0.21.4(debug@4.3.2)
-      debug: 4.3.2
-      openurl: 1.1.1
-      yargs: 17.1.1
-    transitivePeerDependencies:
-      - supports-color
-
   lodash.camelcase@4.3.0: {}
 
   lodash.clonedeep@4.5.0: {}
@@ -11971,8 +11920,6 @@ snapshots:
   mrmime@2.0.1: {}
 
   ms@2.0.0: {}
-
-  ms@2.1.2: {}
 
   ms@2.1.3: {}
 
@@ -12267,8 +12214,6 @@ snapshots:
       - node-opus
       - supports-color
       - utf-8-validate
-
-  openurl@1.1.1: {}
 
   opus-decoder@0.7.11:
     dependencies:
@@ -12593,7 +12538,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  pumble-sdk@1.0.2(socks@2.8.7):
+  pumble-sdk@1.1.0(socks@2.8.7):
     dependencies:
       ajv: 8.18.0
       axios: 1.13.5
@@ -13586,16 +13531,6 @@ snapshots:
   yargs-parser@21.1.1: {}
 
   yargs@16.2.0:
-    dependencies:
-      cliui: 7.0.4
-      escalade: 3.2.0
-      get-caller-file: 2.0.5
-      require-directory: 2.1.1
-      string-width: 4.2.3
-      y18n: 5.0.8
-      yargs-parser: 20.2.9
-
-  yargs@17.1.1:
     dependencies:
       cliui: 7.0.4
       escalade: 3.2.0

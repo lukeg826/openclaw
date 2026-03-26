@@ -51,10 +51,6 @@ export type PumbleAccountConfig = {
     spawnSubagentSessions?: boolean;
     ttlHours?: number;
   };
-  /** Local Express server port for webhook mode. Default: 5111. */
-  webhookPort?: number;
-  /** Static public URL for webhook mode (skips localtunnel if set). */
-  webhookUrl?: string;
 };
 
 export type PumbleConfig = {

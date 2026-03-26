@@ -19,34 +19,22 @@ function makeAccount(overrides: Partial<ResolvedPumbleAccount> = {}): ResolvedPu
 }
 
 describe("buildPumbleManifest", () => {
-  it("produces a valid manifest from account config", () => {
+  it("produces a valid manifest with socket mode enabled", () => {
     const manifest = buildPumbleManifest(makeAccount());
     expect(manifest.id).toBe("app-123");
     expect(manifest.appKey).toBe("key-456");
     expect(manifest.clientSecret).toBe("secret-789");
     expect(manifest.signingSecret).toBe("sig-abc");
-    expect(manifest.socketMode).toBe(false);
+    expect(manifest.socketMode).toBe(true);
     expect(manifest.shortcuts).toEqual([]);
     expect(manifest.slashCommands).toEqual([]);
     expect(manifest.dynamicMenus).toEqual([]);
     expect(manifest.redirectUrls).toEqual([]);
+    expect(manifest.eventSubscriptions.url).toBe("");
     expect(manifest.scopes.botScopes).toContain("messages:read");
     expect(manifest.scopes.botScopes).toContain("messages:write");
     expect(manifest.scopes.userScopes).toEqual([]);
     expect(manifest.eventSubscriptions.events).toContain("NEW_MESSAGE");
-  });
-
-  it("sets webhook URLs when webhookBaseUrl is provided", () => {
-    const manifest = buildPumbleManifest(makeAccount(), "https://example.loca.lt");
-    expect(manifest.socketMode).toBe(false);
-    expect(manifest.eventSubscriptions.url).toBe("https://example.loca.lt/hook");
-    expect(manifest.redirectUrls).toEqual(["https://example.loca.lt/redirect"]);
-  });
-
-  it("strips trailing slashes from webhookBaseUrl", () => {
-    const manifest = buildPumbleManifest(makeAccount(), "https://example.loca.lt///");
-    expect(manifest.eventSubscriptions.url).toBe("https://example.loca.lt/hook");
-    expect(manifest.redirectUrls).toEqual(["https://example.loca.lt/redirect"]);
   });
 
   it("trims whitespace from credential fields", () => {
@@ -94,8 +82,7 @@ describe("buildPumbleManifest", () => {
 });
 
 describe("createPumbleAddon", () => {
-  it("returns an Addon instance with HTTP mode and correct port", async () => {
-    // Mock the pumble-sdk setup function to avoid real SDK initialization
+  it("returns an Addon instance with socket mode enabled", async () => {
     vi.doMock("pumble-sdk", () => ({
       setup: vi.fn((manifest: Record<string, unknown>, options: Record<string, unknown>) => ({
         getManifest: () => manifest,
@@ -117,14 +104,11 @@ describe("createPumbleAddon", () => {
       deleteForUser: vi.fn(),
     };
 
-    const addon = createPumbleAddon(makeAccount(), store, {
-      webhookBaseUrl: "https://test.loca.lt",
-      port: 3000,
-    });
+    const addon = createPumbleAddon(makeAccount(), store);
     expect(addon).toBeDefined();
     expect(addon.getManifest().id).toBe("app-123");
-    expect(addon.getManifest().socketMode).toBe(false);
-    expect(addon.getManifest().eventSubscriptions.url).toBe("https://test.loca.lt/hook");
+    expect(addon.getManifest().socketMode).toBe(true);
+    expect(addon.getManifest().eventSubscriptions.url).toBe("");
 
     vi.doUnmock("pumble-sdk");
   });

@@ -1,14 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Pumble live integration test — starts the pumble-sdk addon in HTTP webhook
- * mode with localtunnel and echoes messages.
+ * Pumble live integration test — starts the pumble-sdk addon in WebSocket
+ * (socket) mode and echoes messages.
  *
- * This is a minimal echo bot that proves the full webhook round-trip works:
- *   1. Open localtunnel for public HTTPS URL
- *   2. Sync manifest (webhook URLs) to Pumble server
- *   3. Start Express HTTP server via pumble-sdk
- *   4. Listen for NEW_MESSAGE / REACTION_ADDED / UPDATED_MESSAGE events
- *   5. Echo each message back to the same channel
+ * This is a minimal echo bot that proves the full WebSocket round-trip works:
+ *   1. Connect to Pumble via WebSocket (socket mode)
+ *   2. Listen for NEW_MESSAGE / REACTION_ADDED / UPDATED_MESSAGE events
+ *   3. Echo each message back to the same channel
  *
  * Usage:
  *   bun extensions/pumble/scripts/test-pumble-live.ts
@@ -16,7 +14,7 @@
  * Reads credentials from ~/.openclaw/openclaw.json → channels.pumble.
  * Override with env vars: PUMBLE_APP_ID, PUMBLE_APP_KEY, etc.
  *
- * Times out after 180s. Send a message to the bot in Pumble to verify.
+ * Times out after 600s. Send a message to the bot in Pumble to verify.
  */
 
 import { readFileSync } from "node:fs";
@@ -25,14 +23,9 @@ import { join } from "node:path";
 import { fetchWithSsrFGuard } from "openclaw/plugin-sdk";
 import { setup } from "pumble-sdk";
 import type { AddonManifest, CredentialsStore, OAuth2AccessTokenResponse } from "pumble-sdk";
-import { syncManifestToServer } from "../src/pumble/manifest-sync.js";
-import { startTunnel } from "../src/pumble/tunnel.js";
 
 const PUMBLE_API = "https://api-ga.pumble.com";
 const TIMEOUT_MS = Number(process.env.PUMBLE_LIVE_TIMEOUT) || 600_000;
-const WEBHOOK_PORT = 5111;
-/** If set, skip localtunnel and use this URL (e.g. from cloudflared). */
-const STATIC_WEBHOOK_URL = process.env.WEBHOOK_URL ?? "";
 
 // ── Credential loading ──────────────────────────────────────────────
 
@@ -123,8 +116,8 @@ class TestCredentialsStore implements CredentialsStore {
 // ── Main ────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("Pumble Live Integration Test (HTTP Webhook Echo Bot)");
-  console.log("=".repeat(55));
+  console.log("Pumble Live Integration Test (WebSocket Echo Bot)");
+  console.log("=".repeat(50));
 
   const creds = loadCredentials();
 
@@ -145,7 +138,6 @@ async function main() {
   console.log(`botToken: ${creds.botToken.slice(0, 20)}...`);
 
   // Resolve bot user ID so we can ignore our own messages.
-  // Priority: 1. JWT workspaceUser claim, 2. /oauth2/me API
   let botUserId: string | undefined;
   try {
     const parts = creds.botToken.split(".");
@@ -187,27 +179,20 @@ async function main() {
     }
   }
 
-  // Step 1: Open tunnel (cloudflared via WEBHOOK_URL, or localtunnel fallback)
-  console.log(`\nStep 1: Opening tunnel on port ${WEBHOOK_PORT}...`);
-  if (STATIC_WEBHOOK_URL) {
-    console.log(`  Using static WEBHOOK_URL (cloudflared): ${STATIC_WEBHOOK_URL}`);
-  }
-  const tunnel = await startTunnel(WEBHOOK_PORT, STATIC_WEBHOOK_URL || undefined);
-  console.log(`  Tunnel URL: ${tunnel.url}`);
-
-  // Step 2: Build manifest with webhook URLs
+  // Step 1: Build manifest with socket mode enabled
+  console.log(`\nStep 1: Building manifest with socketMode=true...`);
   const manifest: AddonManifest = {
     id: creds.appId,
-    socketMode: false,
+    socketMode: true,
     appKey: creds.appKey,
     clientSecret: creds.clientSecret,
     signingSecret: creds.signingSecret,
     shortcuts: [],
     slashCommands: [],
     dynamicMenus: [],
-    redirectUrls: [`${tunnel.url}/redirect`],
+    redirectUrls: [],
     eventSubscriptions: {
-      url: `${tunnel.url}/hook`,
+      url: "",
       events: ["NEW_MESSAGE", "REACTION_ADDED", "UPDATED_MESSAGE"],
     },
     scopes: {
@@ -224,24 +209,12 @@ async function main() {
     },
   };
 
-  console.log(`\nStep 2: Manifest built`);
-  console.log(`  Event URL:    ${manifest.eventSubscriptions.url}`);
-  console.log(`  Redirect URL: ${manifest.redirectUrls[0]}`);
-
-  // Step 3: Sync manifest to Pumble server
-  console.log(`\nStep 3: Syncing manifest to Pumble server...`);
-  const synced = await syncManifestToServer(manifest, (msg) => console.log(`  ${msg}`));
-  if (!synced) {
-    console.log(
-      "  Warning: manifest sync skipped/failed — webhook URLs may need manual update in Pumble dashboard",
-    );
-  }
-
-  // Step 4: Create addon and register handlers
-  console.log(`\nStep 4: Creating addon and registering handlers...`);
+  // Step 2: Create addon and register handlers
+  console.log(`\nStep 2: Creating addon and registering handlers...`);
   const store = new TestCredentialsStore(creds.botToken);
+  // serverPort is required by the SDK type signature but unused in socket mode.
   const addon = setup(manifest, {
-    serverPort: WEBHOOK_PORT,
+    serverPort: 0,
     oauth2Config: { tokenStore: store },
   });
 
@@ -281,7 +254,7 @@ async function main() {
         }
       }
 
-      // Filter system messages (same as monitor.ts)
+      // Filter system messages
       if (sys === true) {
         console.log(`  DROPPED: system message (join/leave/topic change)`);
         return;
@@ -296,7 +269,7 @@ async function main() {
 
       // Echo back via REST API
       if (channelId && text) {
-        const echoText = `[webhook echo] ${text}`;
+        const echoText = `[ws echo] ${text}`;
         try {
           const echoHeaders: Record<string, string> = {
             token: creds.botToken,
@@ -352,38 +325,28 @@ async function main() {
     console.error(`\nAddon error:`, err);
   });
 
-  // Step 5: Start the Express server
-  console.log(`\nStep 5: Starting HTTP webhook server on port ${WEBHOOK_PORT}...`);
+  // Step 3: Start the WebSocket connection
+  console.log(`\nStep 3: Starting WebSocket connection...`);
   console.log(`Timeout: ${TIMEOUT_MS / 1000}s — send a message to the bot in Pumble to test.\n`);
 
   const timeout = setTimeout(() => {
     console.log(`\nTimeout reached (${TIMEOUT_MS / 1000}s).`);
     if (messageCount === 0 && reactionCount === 0) {
       console.log("No events received. Possible causes:");
-      console.log("  - Manifest sync failed (check webhook URLs in Pumble dashboard)");
-      console.log("  - Localtunnel not reachable from Pumble servers");
+      console.log("  - App not configured for socket mode in Pumble dashboard");
       console.log("  - Bot not added to any channel");
       console.log("  - No messages sent to the bot during the test window");
     } else {
       console.log(`Received ${messageCount} message(s) and ${reactionCount} reaction(s).`);
     }
-    tunnel.close();
     process.exit(messageCount > 0 ? 0 : 1);
   }, TIMEOUT_MS);
 
   try {
-    // Race server against tunnel death for auto-reconnect visibility
-    await Promise.race([
-      addon
-        .start()
-        .then(() => console.log("HTTP webhook server listening — waiting for events...\n")),
-      tunnel.died.then((err) => {
-        throw new Error(`Tunnel lost: ${err.message}`);
-      }),
-    ]);
+    await addon.start();
+    console.log("WebSocket connected — listening for events...\n");
   } catch (err) {
     clearTimeout(timeout);
-    tunnel.close();
     console.error(`\nFailed to start addon: ${err}`);
     if (err instanceof Error) {
       console.error(`  Message: ${err.message}`);

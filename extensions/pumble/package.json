@@ -4,8 +4,7 @@
   "description": "OpenClaw Pumble channel plugin",
   "type": "module",
   "dependencies": {
-    "localtunnel": "^2.0.0",
-    "pumble-sdk": "^1.0.2",
+    "pumble-sdk": "^1.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

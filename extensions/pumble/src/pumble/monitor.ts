@@ -12,11 +12,10 @@ import { getPumbleRuntime } from "../runtime.js";
 import type { PumbleAccountConfig } from "../types.js";
 import { resolvePumbleAccount } from "./accounts.js";
 import { setActivePumbleAddon } from "./active-addon.js";
-import { buildPumbleManifest, createPumbleAddon, DEFAULT_WEBHOOK_PORT } from "./addon.js";
+import { createPumbleAddon } from "./addon.js";
 import { resolveBotUserId as resolveSharedBotUserId } from "./bot-user-id.js";
 import { createPumbleClient, fetchPumbleChannel, fetchPumbleUser } from "./client.js";
 import { OcCredentialsStore } from "./credentials.js";
-import { syncManifestToServer } from "./manifest-sync.js";
 import { resolvePumbleAccessDecision } from "./monitor-auth.js";
 import {
   channelKind,
@@ -31,7 +30,6 @@ import {
 import { runWithReconnect } from "./reconnect.js";
 import { createPumbleThreadBindingManager } from "./thread-bindings.manager.js";
 import { DEFAULT_PUMBLE_THREAD_BINDING_TTL_MS } from "./thread-bindings.types.js";
-import { startTunnel } from "./tunnel.js";
 
 /** Subset of pumble-sdk NotificationMessage fields used by the monitor. */
 type PumbleNotificationMessage = {
@@ -84,11 +82,11 @@ function resolvePumbleThreadBindingTtlMs(config: PumbleAccountConfig): number {
 }
 
 /**
- * Pumble HTTP webhook event listener with reconnection.
+ * Pumble WebSocket event listener with reconnection.
  *
- * Starts an Express server (via pumble-sdk) to receive webhook events from
- * Pumble, using localtunnel (or a static URL) for public HTTPS access.
- * Wrapped with exponential backoff (`runWithReconnect`) for tunnel recovery.
+ * Connects to Pumble via the SDK's socket mode (WebSocket) for real-time
+ * event delivery. No public URL, tunnel, or HTTP server required.
+ * Wrapped with exponential backoff (`runWithReconnect`) for recovery.
  */
 export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promise<void> {
   const core = getPumbleRuntime();
@@ -365,7 +363,7 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
     );
   };
 
-  // Check if SDK credentials are available for webhook mode.
+  // Check if SDK credentials are available for WebSocket mode.
   const canUseSDK = !!(
     account.appId?.trim() &&
     account.appKey?.trim() &&
@@ -374,10 +372,7 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
   );
 
   if (canUseSDK) {
-    // --- HTTP webhook path with reconnection ---
-    const webhookPort = account.config.webhookPort ?? DEFAULT_WEBHOOK_PORT;
-    const staticWebhookUrl = account.config.webhookUrl?.trim() || undefined;
-
+    // --- WebSocket path with reconnection ---
     const registerHandlers = (addon: ReturnType<typeof createPumbleAddon>) => {
       // Register NEW_MESSAGE handler — maps NotificationMessage → handlePumbleMessage
       addon.message("NEW_MESSAGE", { match: /.*/, includeBotMessages: false }, async (ctx) => {
@@ -426,107 +421,39 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
       });
     };
 
-    // Each reconnect iteration opens a tunnel, syncs the manifest, then starts
-    // the Express server. On failure or abort the tunnel is closed.
+    // Each reconnect iteration creates a WebSocket connection via the SDK.
+    // The SDK handles ping/pong keepalive internally (25s interval).
     const connectOnce = async (): Promise<void> => {
-      const tunnel = await startTunnel(webhookPort, staticWebhookUrl);
-      const webhookBaseUrl = tunnel.url;
-      runtime.log?.(`pumble: tunnel open at ${webhookBaseUrl}`);
+      const store = new OcCredentialsStore(account.accountId, account);
+      const addon = createPumbleAddon(account, store);
 
-      // Declared outside try so the finally block can close the HTTP server
-      // to free the port for reconnection (pumble-sdk has no stop() method).
-      let httpServer: import("http").Server | undefined;
+      registerHandlers(addon);
+
+      opts.statusSink?.({ connected: true, lastConnectedAt: Date.now() });
+      runtime.log?.(`pumble: WebSocket connecting for account "${account.accountId}"`);
 
       try {
-        // Sync webhook URLs to Pumble server
-        const manifest = buildPumbleManifest(account, webhookBaseUrl);
-        await syncManifestToServer(manifest, (msg) => runtime.log?.(msg));
-
-        // Create addon in HTTP mode
-        const store = new OcCredentialsStore(account.accountId, account);
-        const addon = createPumbleAddon(account, store, {
-          webhookBaseUrl,
-          port: webhookPort,
-        });
-
-        // Capture the underlying HTTP server by intercepting Express listen().
-        // pumble-sdk does not expose getHttpServer() or a stop() method, so we
-        // intercept listen() on the Express instance to grab the http.Server
-        // reference for clean shutdown. This is instance-level patching (not
-        // prototype mutation) and is the only way to free the port on reconnect.
-        addon.onServerConfiguring((expressApp) => {
-          const origListen = (
-            expressApp as { listen: (...args: unknown[]) => import("http").Server }
-          ).listen.bind(expressApp);
-          (expressApp as { listen: (...args: unknown[]) => import("http").Server }).listen = (
-            ...args: unknown[]
-          ) => {
-            httpServer = origListen(...args);
-            return httpServer!;
-          };
-        });
-
-        registerHandlers(addon);
-
-        // Close tunnel on abort
-        const onAbort = () => tunnel.close();
-        opts.abortSignal?.addEventListener("abort", onAbort, { once: true });
-
-        opts.statusSink?.({ connected: true, lastConnectedAt: Date.now() });
-        runtime.log?.(
-          `pumble: HTTP webhook server starting on port ${webhookPort} for account "${account.accountId}"`,
-        );
-
-        // Start the Express server (resolves once listening).
+        // Start the WebSocket connection (SDK handles transport internally).
         await addon.start();
-
-        // Defensive: if the Express listen() patch didn't capture the server,
-        // the port won't be freed on reconnect. Log a warning so operators know.
-        // TODO: upstream pumble-sdk issue for addon.getHttpServer() or addon.stop()
-        if (!httpServer) {
-          runtime.log?.(
-            `pumble: warning: could not capture HTTP server reference — port ${webhookPort} may not be freed on reconnect`,
-          );
-        }
 
         // Register active addon so send.ts can use the SDK bot client for media uploads.
         const addonWorkspaceId = account.workspaceId || account.accountId;
         setActivePumbleAddon(addon, addonWorkspaceId, account.accountId);
 
-        runtime.log?.(
-          `pumble: HTTP webhook server listening on port ${webhookPort} — waiting for events`,
-        );
+        runtime.log?.(`pumble: WebSocket connected — listening for events`);
 
-        // Keep alive until tunnel dies or abort fires.
-        // addon.start() resolves immediately after Express binds, so we
-        // need a separate hold promise to prevent connectOnce from returning.
-        let removeHoldAbort: (() => void) | undefined;
-        await Promise.race([
-          tunnel.died.then((err) => {
-            throw new Error(`tunnel lost: ${err.message}`);
-          }),
-          new Promise<void>((resolve) => {
-            if (opts.abortSignal?.aborted) {
-              resolve();
-              return;
-            }
-            const onHoldAbort = () => resolve();
-            removeHoldAbort = () => opts.abortSignal?.removeEventListener("abort", onHoldAbort);
-            opts.abortSignal?.addEventListener("abort", onHoldAbort, { once: true });
-          }),
-        ]);
+        // Hold until abort fires.
+        await new Promise<void>((resolve) => {
+          if (opts.abortSignal?.aborted) {
+            resolve();
+            return;
+          }
+          opts.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
+        });
 
-        removeHoldAbort?.();
-        opts.abortSignal?.removeEventListener("abort", onAbort);
         opts.statusSink?.({ connected: false });
       } finally {
         setActivePumbleAddon(null, "", account.accountId);
-        // Close the Express HTTP server to free the port for reconnection.
-        if (httpServer) {
-          httpServer.close();
-          httpServer.closeAllConnections?.();
-        }
-        tunnel.close();
       }
     };
 
@@ -534,7 +461,7 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
       abortSignal: opts.abortSignal,
       jitterRatio: 0.2,
       onError: (err) => {
-        runtime.error?.(`pumble: webhook server failed: ${String(err)}`);
+        runtime.error?.(`pumble: WebSocket connection failed: ${String(err)}`);
         opts.statusSink?.({ connected: false, lastError: String(err) });
       },
       onReconnect: (delayMs) => {
@@ -551,7 +478,7 @@ export async function monitorPumbleProvider(opts: MonitorPumbleOpts = {}): Promi
   opts.statusSink?.({
     running: true,
     connected: false,
-    lastError: "SDK credentials missing — inbound webhooks disabled (REST-only mode)",
+    lastError: "SDK credentials missing — inbound events disabled (REST-only mode)",
   });
 
   // Keep the monitor alive until aborted

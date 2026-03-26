@@ -192,8 +192,8 @@ openclaw gateway
 
     You should see logs like:
     - `pumble: starting monitor for account "default"`
-    - `pumble: tunnel open at https://...`
-    - `pumble: HTTP webhook server listening on port 5111`
+    - `pumble: WebSocket connecting for account "default"`
+    - `pumble: WebSocket connected — listening for events`
 
   </Step>
 </Steps>
@@ -268,37 +268,11 @@ Bare IDs are treated as channels.
 
 Thread replies are supported. Inbound messages with a thread root ID are routed to thread-scoped sessions. Outbound replies are sent as thread replies when the inbound message was in a thread.
 
-## Webhook port and tunneling
+## Connection
 
-The Pumble plugin starts a local HTTP server for receiving webhook events. The default port is **5111**.
+The Pumble plugin connects via WebSocket (socket mode) for real-time event delivery. No public URL, tunnel, or local HTTP server is required — the SDK establishes a persistent WebSocket connection directly to Pumble's servers with automatic ping/pong keepalive.
 
-Override per-account with `channels.pumble.webhookPort` (or `channels.pumble.accounts.<id>.webhookPort`):
-
-```json5
-{
-  channels: {
-    pumble: {
-      webhookPort: 5200,
-    },
-  },
-}
-```
-
-By default, the plugin uses [localtunnel](https://github.com/localtunnel/localtunnel) to expose the local webhook server as a public HTTPS URL. The tunnel URL is registered with the Pumble API automatically on each gateway start.
-
-If you have your own public URL (e.g. via ngrok or Cloudflare Tunnel), set `webhookUrl` to skip localtunnel:
-
-```json5
-{
-  channels: {
-    pumble: {
-      webhookUrl: "https://your-public-url.example.com",
-    },
-  },
-}
-```
-
-The local HTTP server still binds to `webhookPort` but the automatic tunnel is skipped.
+All four SDK credentials (`appId`, `appKey`, `clientSecret`, `signingSecret`) plus a bot token are required for the WebSocket connection.
 
 ## Multi-account
 
@@ -337,8 +311,7 @@ Pumble supports multiple accounts under `channels.pumble.accounts`:
 - **Auth errors**: verify the bot token is valid with `openclaw channels status --probe`.
 - **Bot not responding in channels**: make sure the bot has been invited to the channel in Pumble. Also check `groupPolicy`, `channelAllowlist`, and `requireMention` settings.
 - **DM messages ignored**: check `dmPolicy` and pairing approvals (`openclaw pairing list pumble`).
-- **Tunnel errors / reconnection loops**: if using the default localtunnel, check your network connectivity. For production use, consider setting a static `webhookUrl` via ngrok or Cloudflare Tunnel for more reliable connectivity.
-- **Port conflicts**: if port 5111 is in use, set `webhookPort` to a different value.
+- **WebSocket disconnects**: the SDK auto-reconnects with exponential backoff. Check logs for `pumble: reconnecting in Ns` entries. Persistent failures usually indicate credential issues.
 - **Multi-account issues**: env vars only apply to the `default` account.
 - **Bot user ID not resolved**: set `channels.pumble.botUserId` to the `botId` value from `tokens.json`. This is used for self-message filtering.
 

@@ -2,20 +2,14 @@ import { setup } from "pumble-sdk";
 import type { Addon, AddonManifest, CredentialsStore } from "pumble-sdk";
 import type { ResolvedPumbleAccount } from "./accounts.js";
 
-export const DEFAULT_WEBHOOK_PORT = 5111;
-
 /**
  * Build a pumble-sdk AddonManifest from an OpenClaw Pumble account config.
  *
  * Requires appId, appKey, clientSecret, and signingSecret to be present.
- * Sets `socketMode: false` so the SDK starts an HTTP server for webhook events.
- * When `webhookBaseUrl` is provided, event subscription and redirect URLs are
- * configured to point at the public webhook endpoint.
+ * Sets `socketMode: true` so the SDK connects via WebSocket for real-time
+ * events — no public URL, tunnel, or HTTP webhook server required.
  */
-export function buildPumbleManifest(
-  account: ResolvedPumbleAccount,
-  webhookBaseUrl?: string,
-): AddonManifest {
+export function buildPumbleManifest(account: ResolvedPumbleAccount): AddonManifest {
   if (!account.appId?.trim()) {
     throw new Error("Pumble appId is required for SDK mode");
   }
@@ -29,20 +23,18 @@ export function buildPumbleManifest(
     throw new Error("Pumble signingSecret is required for SDK mode");
   }
 
-  const baseUrl = webhookBaseUrl?.replace(/\/+$/, "") ?? "";
-
   return {
     id: account.appId.trim(),
-    socketMode: false,
+    socketMode: true,
     appKey: account.appKey.trim(),
     clientSecret: account.clientSecret.trim(),
     signingSecret: account.signingSecret.trim(),
     shortcuts: [] as const,
     slashCommands: [] as const,
     dynamicMenus: [] as const,
-    redirectUrls: baseUrl ? [baseUrl + "/redirect"] : ([] as const),
+    redirectUrls: [],
     eventSubscriptions: {
-      url: baseUrl ? baseUrl + "/hook" : "",
+      url: "",
       events: ["NEW_MESSAGE" as const, "REACTION_ADDED" as const, "UPDATED_MESSAGE" as const],
     },
     scopes: {
@@ -64,17 +56,17 @@ export function buildPumbleManifest(
 /**
  * Create a pumble-sdk Addon instance wired with an OcCredentialsStore.
  *
- * The returned Addon uses `socketMode: false` — calling `addon.start()` will
- * start an Express HTTP server on the given port to receive webhook events.
+ * Uses `socketMode: true` — calling `addon.start()` establishes a WebSocket
+ * connection to Pumble for real-time event delivery.
  */
 export function createPumbleAddon(
   account: ResolvedPumbleAccount,
   credentialsStore: CredentialsStore,
-  opts?: { webhookBaseUrl?: string; port?: number },
 ): Addon {
-  const manifest = buildPumbleManifest(account, opts?.webhookBaseUrl);
+  const manifest = buildPumbleManifest(account);
+  // serverPort is required by the SDK type signature but unused in socket mode.
   return setup(manifest, {
-    serverPort: opts?.port ?? account.config.webhookPort ?? DEFAULT_WEBHOOK_PORT,
+    serverPort: 0,
     oauth2Config: {
       tokenStore: credentialsStore,
     },
